@@ -10,6 +10,7 @@ import Apostas from "./pages/Apostas";
 import Contas from "./pages/Contas";
 import Financeiro from "./pages/Financeiro";
 import Operadores from "./pages/Operadores";
+import CriarUsuario from "./pages/CriarUsuario";
 import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/contas" element={<Contas />} />
             <Route path="/financeiro" element={<Financeiro />} />
             <Route path="/operadores" element={<Operadores />} />
+            <Route path="/criar-usuario" element={<CriarUsuario />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
