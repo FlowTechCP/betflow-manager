@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,19 +8,31 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Users, Shield, ShieldCheck } from 'lucide-react';
+import { Users, Shield, ShieldCheck, Trash2 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
-import { Profile, AppRole } from '@/types/database';
+import { AppRole } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { OperatorFilters } from '@/components/operadores/OperatorFilters';
+import { DeleteOperatorDialog } from '@/components/operadores/DeleteOperatorDialog';
+
+interface OperatorWithRoles {
+  id: string;
+  name: string;
+  email: string | null;
+  roles: AppRole[];
+}
 
 export default function Operadores() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, profile } = useAuth();
   const queryClient = useQueryClient();
-
-  // Redirect if not admin
-  if (!isAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  
+  // Filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  
+  // Delete state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [operatorToDelete, setOperatorToDelete] = useState<OperatorWithRoles | null>(null);
 
   // Fetch operators with their roles
   const { data: operators, isLoading } = useQuery({
@@ -33,7 +45,6 @@ export default function Operadores() {
 
       if (profilesError) throw profilesError;
 
-      // Fetch roles for each profile
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
         .select('*');
@@ -45,15 +56,32 @@ export default function Operadores() {
         roles: roles.filter(r => r.user_id === profile.id).map(r => r.role as AppRole),
       }));
     },
+    enabled: isAdmin,
   });
+
+  // Filter operators based on search and role
+  const filteredOperators = useMemo(() => {
+    if (!operators) return [];
+    
+    return operators.filter(operator => {
+      const matchesSearch = 
+        operator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (operator.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
+      
+      const matchesRole = 
+        roleFilter === 'all' ||
+        (roleFilter === 'admin' && operator.roles.includes('admin')) ||
+        (roleFilter === 'operator' && !operator.roles.includes('admin'));
+      
+      return matchesSearch && matchesRole;
+    });
+  }, [operators, searchTerm, roleFilter]);
 
   // Update role mutation
   const updateRole = useMutation({
     mutationFn: async ({ profileId, newRole }: { profileId: string; newRole: AppRole }) => {
-      // First delete existing roles
       await supabase.from('user_roles').delete().eq('user_id', profileId);
       
-      // Then insert new role
       const { error } = await supabase.from('user_roles').insert({
         user_id: profileId,
         role: newRole,
@@ -69,6 +97,52 @@ export default function Operadores() {
       toast.error('Erro ao atualizar permissão: ' + error.message);
     },
   });
+
+  // Delete user mutation
+  const deleteUser = useMutation({
+    mutationFn: async (profileId: string) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      const response = await supabase.functions.invoke('delete-user', {
+        body: { profileId },
+        headers: {
+          Authorization: `Bearer ${sessionData.session?.access_token}`,
+        },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
+      
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operators'] });
+      toast.success('Usuário excluído com sucesso!');
+      setDeleteDialogOpen(false);
+      setOperatorToDelete(null);
+    },
+    onError: (error) => {
+      toast.error('Erro ao excluir usuário: ' + error.message);
+    },
+  });
+
+  const handleDeleteClick = (operator: OperatorWithRoles) => {
+    setOperatorToDelete(operator);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (operatorToDelete) {
+      deleteUser.mutate(operatorToDelete.id);
+    }
+  };
+
+  const isCurrentUser = (operatorId: string) => profile?.id === operatorId;
+
+  // Redirect if not admin
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <DashboardLayout>
@@ -120,12 +194,25 @@ export default function Operadores() {
           </Card>
         </div>
 
+        {/* Filters */}
+        <OperatorFilters
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          roleFilter={roleFilter}
+          onRoleFilterChange={setRoleFilter}
+        />
+
         {/* Operators Table */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
               Lista de Operadores
+              {filteredOperators.length !== operators?.length && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  ({filteredOperators.length} de {operators?.length})
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -135,7 +222,7 @@ export default function Operadores() {
                   <Skeleton key={i} className="h-16" />
                 ))}
               </div>
-            ) : operators && operators.length > 0 ? (
+            ) : filteredOperators.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="data-table">
                   <thead>
@@ -144,10 +231,11 @@ export default function Operadores() {
                       <th>Email</th>
                       <th>Função Atual</th>
                       <th>Alterar Função</th>
+                      <th className="w-16">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {operators.map((operator) => (
+                    {filteredOperators.map((operator) => (
                       <tr key={operator.id}>
                         <td>
                           <div className="flex items-center gap-3">
@@ -156,7 +244,12 @@ export default function Operadores() {
                                 {operator.name.charAt(0).toUpperCase()}
                               </span>
                             </div>
-                            <span className="font-medium">{operator.name}</span>
+                            <div>
+                              <span className="font-medium">{operator.name}</span>
+                              {isCurrentUser(operator.id) && (
+                                <span className="ml-2 text-xs text-muted-foreground">(você)</span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="text-muted-foreground">{operator.email}</td>
@@ -177,6 +270,7 @@ export default function Operadores() {
                               profileId: operator.id, 
                               newRole: value as AppRole 
                             })}
+                            disabled={isCurrentUser(operator.id)}
                           >
                             <SelectTrigger className="w-40">
                               <SelectValue />
@@ -187,10 +281,26 @@ export default function Operadores() {
                             </SelectContent>
                           </Select>
                         </td>
+                        <td>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteClick(operator)}
+                            disabled={isCurrentUser(operator.id)}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            title={isCurrentUser(operator.id) ? 'Você não pode excluir sua própria conta' : 'Excluir usuário'}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            ) : operators && operators.length > 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum operador encontrado com os filtros selecionados.
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
@@ -200,6 +310,15 @@ export default function Operadores() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteOperatorDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        operatorName={operatorToDelete?.name || ''}
+        onConfirm={handleConfirmDelete}
+        isDeleting={deleteUser.isPending}
+      />
     </DashboardLayout>
   );
 }
