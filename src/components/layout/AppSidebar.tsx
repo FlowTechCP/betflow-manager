@@ -27,6 +27,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const operatorMenuItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
@@ -114,28 +115,33 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
-        <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
-          {!collapsed && profile && (
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <span className="text-primary text-sm font-medium">
-                  {profile.name.charAt(0).toUpperCase()}
-                </span>
+        <div className={cn("flex flex-col gap-3", collapsed && "items-center")}>
+          <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
+            {!collapsed && profile && (
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <span className="text-primary text-sm font-medium">
+                    {profile.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{profile.name}</p>
+                  <p className="text-xs text-muted-foreground">{isAdmin ? 'Admin' : 'Operador'}</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{profile.name}</p>
-                <p className="text-xs text-muted-foreground">{isAdmin ? 'Admin' : 'Operador'}</p>
-              </div>
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={signOut}
-            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
+            )}
+          </div>
+          <div className={cn("flex items-center gap-2", collapsed ? "flex-col" : "justify-between")}>
+            <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={signOut}
+              className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </SidebarFooter>
     </Sidebar>
