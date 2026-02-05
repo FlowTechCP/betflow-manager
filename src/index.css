@@ -112,9 +112,6 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
 
-  html {
-    @apply dark;
-  }
 }
 
 @layer components {
