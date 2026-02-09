@@ -198,26 +198,26 @@ export function DashboardStatsCarousel({ bets, isLoading }: DashboardStatsCarous
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="data-table text-xs">
+                <table className="data-table text-xs w-full">
                   <thead>
                     <tr>
-                      <th>Software</th>
-                      <th>Apostado</th>
-                      <th>Lucro</th>
-                      <th>Qtd.</th>
-                      <th>ROI</th>
+                      <th className="text-left">Software</th>
+                      <th className="text-right">Total Apostado (R$)</th>
+                      <th className="text-right">Lucro Total (R$)</th>
+                      <th className="text-center">Qtd. Apostas</th>
+                      <th className="text-right">ROI (%)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {softwareBreakdown.map(s => (
                       <tr key={s.name}>
-                        <td className="font-medium">{s.name}</td>
-                        <td className="mono-number">{formatCurrency(s.totalVolume)}</td>
-                        <td className={`mono-number font-medium ${s.totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        <td className="font-bold">{s.name}</td>
+                        <td className="mono-number text-right">{formatCurrency(s.totalVolume)}</td>
+                        <td className={`mono-number font-medium text-right ${s.totalProfit >= 0 ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
                           {formatCurrency(s.totalProfit)}
                         </td>
-                        <td className="mono-number">{s.totalBets}</td>
-                        <td className={`mono-number font-medium ${s.roi >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        <td className="mono-number text-center">{s.totalBets}</td>
+                        <td className={`mono-number font-medium text-right ${s.roi >= 0 ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
                           {s.roi.toFixed(2)}%
                         </td>
                       </tr>
