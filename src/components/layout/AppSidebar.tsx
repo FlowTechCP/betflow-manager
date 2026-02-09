@@ -8,7 +8,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  UserPlus
+  UserPlus,
+  Cpu
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +43,7 @@ const adminMenuItems = [
   { title: 'Financeiro', url: '/financeiro', icon: Wallet },
   { title: 'Operadores', url: '/operadores', icon: Users },
   { title: 'Criar Usuário', url: '/criar-usuario', icon: UserPlus },
+  { title: 'Softwares', url: '/softwares', icon: Cpu },
   { title: 'Analytics', url: '/analytics', icon: TrendingUp },
 ];
 

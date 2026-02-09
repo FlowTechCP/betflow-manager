@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +12,6 @@ import {
   betResultLabels,
   marketTimeLabels,
   sportOptions,
-  softwareOptions,
 } from '@/types/database';
 
 export interface BetFormData {
@@ -63,6 +64,19 @@ export function BetFormDialog({
   submitLabel,
 }: BetFormDialogProps) {
   const [form, setForm] = useState<BetFormData>(emptyForm);
+
+  const { data: softwareTools } = useQuery({
+    queryKey: ['software-tools-active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('software_tools')
+        .select('name')
+        .eq('active', true)
+        .order('name');
+      if (error) throw error;
+      return data.map(s => s.name);
+    },
+  });
 
   useEffect(() => {
     if (open) {
@@ -146,7 +160,7 @@ export function BetFormDialog({
             <Select value={form.software_tool} onValueChange={(v) => setForm({ ...form, software_tool: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {softwareOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {(softwareTools || []).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
