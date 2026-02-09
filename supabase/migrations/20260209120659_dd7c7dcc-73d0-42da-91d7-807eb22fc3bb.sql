@@ -1,0 +1,1 @@
+ALTER TYPE public.bet_result ADD VALUE 'pendente';

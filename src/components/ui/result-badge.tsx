@@ -8,6 +8,7 @@ interface ResultBadgeProps {
 
 export function ResultBadge({ result, className }: ResultBadgeProps) {
   const resultClasses: Record<BetResult, string> = {
+    pendente: 'result-void',
     green: 'result-green',
     red: 'result-red',
     void: 'result-void',
