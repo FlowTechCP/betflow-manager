@@ -6,6 +6,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -108,6 +109,7 @@ export default function Financeiro() {
     amount: '',
     description: '',
     bank_name: 'Inter',
+    is_recurring: false,
   });
 
   // Create transaction mutation
@@ -120,6 +122,7 @@ export default function Financeiro() {
         amount: parseFloat(form.amount),
         description: form.description || null,
         bank_name: form.bank_name,
+        is_recurring: form.is_recurring,
       });
       if (error) throw error;
     },
@@ -142,13 +145,14 @@ export default function Financeiro() {
       amount: '',
       description: '',
       bank_name: 'Inter',
+      is_recurring: false,
     });
   };
 
   // Calculate DRE
   const revenue = betsProfit || 0;
   const variableCosts = limitedAccountsCost || 0;
-  const fixedCosts = transactions?.filter(t => t.type === 'custo_operacional' && t.category?.toLowerCase() === 'recorrente')
+  const fixedCosts = transactions?.filter(t => t.is_recurring)
     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0) || 0;
   const investments = transactions?.filter(t => t.type === 'aporte')
     .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
@@ -275,6 +279,15 @@ export default function Financeiro() {
                       value={form.category}
                       onChange={(e) => setForm({ ...form, category: e.target.value })}
                       placeholder="Ex: Salários, Software, Proxy"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <Label htmlFor="is_recurring" className="cursor-pointer">Recorrente</Label>
+                    <Switch
+                      id="is_recurring"
+                      checked={form.is_recurring}
+                      onCheckedChange={(checked) => setForm({ ...form, is_recurring: checked })}
                     />
                   </div>
 
