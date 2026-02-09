@@ -13,6 +13,7 @@ import Financeiro from "./pages/Financeiro";
 import Operadores from "./pages/Operadores";
 import CriarUsuario from "./pages/CriarUsuario";
 import Analytics from "./pages/Analytics";
+import Softwares from "./pages/Softwares";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/operadores" element={<Operadores />} />
             <Route path="/criar-usuario" element={<CriarUsuario />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/softwares" element={<Softwares />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
