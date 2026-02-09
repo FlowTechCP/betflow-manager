@@ -270,6 +270,7 @@ export type Database = {
           date: string
           description: string | null
           id: string
+          is_recurring: boolean
           related_account_id: string | null
           related_operator_id: string | null
           type: Database["public"]["Enums"]["transaction_type"]
@@ -282,6 +283,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          is_recurring?: boolean
           related_account_id?: string | null
           related_operator_id?: string | null
           type: Database["public"]["Enums"]["transaction_type"]
@@ -294,6 +296,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          is_recurring?: boolean
           related_account_id?: string | null
           related_operator_id?: string | null
           type?: Database["public"]["Enums"]["transaction_type"]
@@ -376,6 +379,12 @@ export type Database = {
         | "compra_conta"
         | "correcao"
         | "recebido"
+        | "comissao"
+        | "despesa"
+        | "imposto"
+        | "recarga"
+        | "ads"
+        | "proxy"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -521,6 +530,12 @@ export const Constants = {
         "compra_conta",
         "correcao",
         "recebido",
+        "comissao",
+        "despesa",
+        "imposto",
+        "recarga",
+        "ads",
+        "proxy",
       ],
     },
   },

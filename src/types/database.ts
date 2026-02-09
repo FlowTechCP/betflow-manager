@@ -3,7 +3,7 @@
 export type AppRole = 'admin' | 'operator';
 export type AccountStatus = 'em_uso' | 'limitada' | 'cevando' | 'transferida';
 export type BetResult = 'green' | 'red' | 'void' | 'meio_green' | 'meio_red' | 'pendente';
-export type TransactionType = 'aporte' | 'retirada' | 'custo_operacional' | 'compra_conta' | 'correcao' | 'recebido';
+export type TransactionType = 'aporte' | 'retirada' | 'custo_operacional' | 'compra_conta' | 'correcao' | 'recebido' | 'comissao' | 'despesa' | 'imposto' | 'recarga' | 'ads' | 'proxy';
 export type MarketTime = 'jogo_todo' | '1_tempo' | '2_tempo';
 
 export interface Profile {
@@ -86,6 +86,7 @@ export interface Transaction {
   bank_name: string | null;
   related_operator_id: string | null;
   related_account_id: string | null;
+  is_recurring: boolean;
   created_at: string;
   // Joined data
   operator?: Profile;
@@ -123,6 +124,12 @@ export const transactionTypeLabels: Record<TransactionType, string> = {
   compra_conta: 'Compra de Conta',
   correcao: 'Correção',
   recebido: 'Recebido',
+  comissao: 'Comissão',
+  despesa: 'Despesa',
+  imposto: 'Imposto',
+  recarga: 'Recarga',
+  ads: 'Ads',
+  proxy: 'Proxy',
 };
 
 export const marketTimeLabels: Record<MarketTime, string> = {
