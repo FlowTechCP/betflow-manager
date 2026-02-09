@@ -148,7 +148,7 @@ export default function Financeiro() {
   // Calculate DRE
   const revenue = betsProfit || 0;
   const variableCosts = limitedAccountsCost || 0;
-  const fixedCosts = transactions?.filter(t => t.type === 'custo_operacional')
+  const fixedCosts = transactions?.filter(t => t.type === 'custo_operacional' && t.category?.toLowerCase() === 'recorrente')
     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0) || 0;
   const investments = transactions?.filter(t => t.type === 'aporte')
     .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
