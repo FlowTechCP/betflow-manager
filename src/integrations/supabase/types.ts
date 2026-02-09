@@ -340,7 +340,13 @@ export type Database = {
     Enums: {
       account_status: "em_uso" | "limitada" | "cevando" | "transferida"
       app_role: "admin" | "operator"
-      bet_result: "green" | "red" | "void" | "meio_green" | "meio_red"
+      bet_result:
+        | "green"
+        | "red"
+        | "void"
+        | "meio_green"
+        | "meio_red"
+        | "pendente"
       market_time: "jogo_todo" | "1_tempo" | "2_tempo"
       transaction_type:
         | "aporte"
@@ -478,7 +484,14 @@ export const Constants = {
     Enums: {
       account_status: ["em_uso", "limitada", "cevando", "transferida"],
       app_role: ["admin", "operator"],
-      bet_result: ["green", "red", "void", "meio_green", "meio_red"],
+      bet_result: [
+        "green",
+        "red",
+        "void",
+        "meio_green",
+        "meio_red",
+        "pendente",
+      ],
       market_time: ["jogo_todo", "1_tempo", "2_tempo"],
       transaction_type: [
         "aporte",

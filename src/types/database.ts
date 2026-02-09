@@ -2,7 +2,7 @@
 
 export type AppRole = 'admin' | 'operator';
 export type AccountStatus = 'em_uso' | 'limitada' | 'cevando' | 'transferida';
-export type BetResult = 'green' | 'red' | 'void' | 'meio_green' | 'meio_red';
+export type BetResult = 'green' | 'red' | 'void' | 'meio_green' | 'meio_red' | 'pendente';
 export type TransactionType = 'aporte' | 'retirada' | 'custo_operacional' | 'compra_conta' | 'correcao' | 'recebido';
 export type MarketTime = 'jogo_todo' | '1_tempo' | '2_tempo';
 
@@ -108,6 +108,7 @@ export const accountStatusLabels: Record<AccountStatus, string> = {
 };
 
 export const betResultLabels: Record<BetResult, string> = {
+  pendente: 'Pendente',
   green: 'Green',
   red: 'Red',
   void: 'Void',
