@@ -10,11 +10,12 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatDate, getMonthYear, getMonthYearKey } from '@/lib/format';
 import { toast } from 'sonner';
-import { Plus, Wallet, TrendingUp, TrendingDown, PiggyBank, BarChart3, Landmark } from 'lucide-react';
+import { Plus, Wallet, TrendingUp, TrendingDown, PiggyBank, BarChart3, Landmark, Pencil, Trash2 } from 'lucide-react';
 import { TransactionType, transactionTypeLabels, Transaction } from '@/types/database';
 import { Navigate } from 'react-router-dom';
 import { StatCard } from '@/components/ui/stat-card';
@@ -24,6 +25,8 @@ export default function Financeiro() {
   const { isAdmin, profile } = useAuth();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<(Transaction & { operator: { name: string } | null }) | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(getMonthYearKey(new Date().toISOString()));
 
   // Fetch transactions
@@ -129,10 +132,10 @@ export default function Financeiro() {
     is_recurring: false,
   });
 
-  // Create transaction mutation
-  const createTransaction = useMutation({
+  // Save transaction mutation (create or update)
+  const saveTransaction = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from('transactions').insert({
+      const payload = {
         date: form.date,
         type: form.type,
         category: form.category || null,
@@ -140,18 +143,39 @@ export default function Financeiro() {
         description: form.description || null,
         bank_name: form.bank_name,
         is_recurring: form.is_recurring,
-      });
+      };
+      if (editingTransaction) {
+        const { error } = await supabase.from('transactions').update(payload).eq('id', editingTransaction.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('transactions').insert(payload);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      toast.success(editingTransaction ? 'Transação atualizada!' : 'Transação registrada!');
+      setIsDialogOpen(false);
+      setEditingTransaction(null);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error('Erro: ' + error.message);
+    },
+  });
+
+  // Delete transaction mutation
+  const deleteTransaction = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('transactions').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      toast.success('Transação registrada!');
-      setIsDialogOpen(false);
-      resetForm();
+      toast.success('Transação excluída!');
+      setDeletingId(null);
     },
-    onError: (error) => {
-      toast.error('Erro ao registrar transação: ' + error.message);
-    },
+    onError: (e) => toast.error('Erro: ' + e.message),
   });
 
   const resetForm = () => {
@@ -164,6 +188,20 @@ export default function Financeiro() {
       bank_name: 'Inter',
       is_recurring: false,
     });
+  };
+
+  const openEditDialog = (t: Transaction & { operator: { name: string } | null }) => {
+    setEditingTransaction(t);
+    setForm({
+      date: t.date,
+      type: t.type,
+      category: t.category || '',
+      amount: String(t.amount),
+      description: t.description || '',
+      bank_name: t.bank_name || 'Inter',
+      is_recurring: t.is_recurring,
+    });
+    setIsDialogOpen(true);
   };
 
   // Calculate DRE
@@ -217,7 +255,10 @@ export default function Financeiro() {
               </SelectContent>
             </Select>
 
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) { setEditingTransaction(null); resetForm(); }
+            }}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Plus className="h-4 w-4" />
@@ -226,10 +267,10 @@ export default function Financeiro() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Registrar Transação</DialogTitle>
+                  <DialogTitle>{editingTransaction ? 'Editar Transação' : 'Registrar Transação'}</DialogTitle>
                 </DialogHeader>
                 <form 
-                  onSubmit={(e) => { e.preventDefault(); createTransaction.mutate(); }}
+                  onSubmit={(e) => { e.preventDefault(); saveTransaction.mutate(); }}
                   className="space-y-4 py-4"
                 >
                   <div className="grid grid-cols-2 gap-4">
@@ -318,18 +359,34 @@ export default function Financeiro() {
                   </div>
 
                   <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    <Button type="button" variant="outline" onClick={() => { setIsDialogOpen(false); setEditingTransaction(null); resetForm(); }}>
                       Cancelar
                     </Button>
-                    <Button type="submit" disabled={createTransaction.isPending}>
-                      {createTransaction.isPending ? 'Salvando...' : 'Salvar'}
+                    <Button type="submit" disabled={saveTransaction.isPending}>
+                      {saveTransaction.isPending ? 'Salvando...' : 'Salvar'}
                     </Button>
                   </div>
                 </form>
               </DialogContent>
             </Dialog>
           </div>
-        </div>
+          </div>
+
+          {/* Delete Confirmation */}
+          <AlertDialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir Transação</AlertDialogTitle>
+                <AlertDialogDescription>Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => deletingId && deleteTransaction.mutate(deletingId)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  {deleteTransaction.isPending ? 'Excluindo...' : 'Excluir'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
         <Tabs defaultValue="dre" className="space-y-6">
           <TabsList>
@@ -500,6 +557,7 @@ export default function Financeiro() {
                           <th>Categoria</th>
                           <th>Valor</th>
                           <th>Descrição</th>
+                          <th className="text-center">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -526,6 +584,16 @@ export default function Financeiro() {
                               {formatCurrency(Number(t.amount))}
                             </td>
                             <td className="text-sm text-muted-foreground max-w-[200px] truncate">{t.description || '-'}</td>
+                            <td>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(t)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeletingId(t.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
