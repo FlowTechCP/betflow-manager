@@ -9,11 +9,13 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Apostas from "./pages/Apostas";
 import Contas from "./pages/Contas";
+import Depositos from "./pages/Depositos";
 import Financeiro from "./pages/Financeiro";
 import Operadores from "./pages/Operadores";
 import CriarUsuario from "./pages/CriarUsuario";
 import Analytics from "./pages/Analytics";
 import Softwares from "./pages/Softwares";
+import Casas from "./pages/Casas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,11 +34,13 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/apostas" element={<Apostas />} />
             <Route path="/contas" element={<Contas />} />
+            <Route path="/depositos" element={<Depositos />} />
             <Route path="/financeiro" element={<Financeiro />} />
             <Route path="/operadores" element={<Operadores />} />
             <Route path="/criar-usuario" element={<CriarUsuario />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/softwares" element={<Softwares />} />
+            <Route path="/casas" element={<Casas />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

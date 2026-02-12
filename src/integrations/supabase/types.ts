@@ -213,6 +213,51 @@ export type Database = {
         }
         Relationships: []
       }
+      deposits: {
+        Row: {
+          account_id: string
+          amount: number
+          created_at: string
+          created_by: string
+          date: string
+          description: string | null
+          id: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          created_at?: string
+          created_by: string
+          date?: string
+          description?: string | null
+          id?: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          created_at?: string
+          created_by?: string
+          date?: string
+          description?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deposits_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deposits_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatDate, getMonthYear, getMonthYearKey } from '@/lib/format';
 import { toast } from 'sonner';
-import { Plus, Wallet, TrendingUp, TrendingDown, PiggyBank, BarChart3 } from 'lucide-react';
+import { Plus, Wallet, TrendingUp, TrendingDown, PiggyBank, BarChart3, Landmark } from 'lucide-react';
 import { TransactionType, transactionTypeLabels, Transaction } from '@/types/database';
 import { Navigate } from 'react-router-dom';
 import { StatCard } from '@/components/ui/stat-card';
@@ -78,6 +78,23 @@ export default function Financeiro() {
 
       if (error) throw error;
       return data.reduce((sum, bet) => sum + Number(bet.profit), 0);
+    },
+  });
+
+  // Fetch total deposits for Caixa
+  const { data: totalDeposits } = useQuery({
+    queryKey: ['total-deposits', selectedMonth],
+    queryFn: async () => {
+      const [year, month] = selectedMonth.split('-');
+      const startDate = `${year}-${month}-01`;
+      const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('deposits')
+        .select('amount')
+        .gte('date', startDate)
+        .lte('date', endDate);
+      if (error) throw error;
+      return data.reduce((sum, d) => sum + Number(d.amount), 0);
     },
   });
 
@@ -317,6 +334,7 @@ export default function Financeiro() {
         <Tabs defaultValue="dre" className="space-y-6">
           <TabsList>
             <TabsTrigger value="dre">DRE</TabsTrigger>
+            <TabsTrigger value="caixa">Caixa</TabsTrigger>
             <TabsTrigger value="transactions">Movimentações</TabsTrigger>
             <TabsTrigger value="banks">Bancos</TabsTrigger>
           </TabsList>
@@ -390,6 +408,69 @@ export default function Financeiro() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Caixa Tab */}
+          <TabsContent value="caixa" className="space-y-6">
+            {(() => {
+              const aportes = transactions?.filter(t => t.type === 'aporte').reduce((s, t) => s + Number(t.amount), 0) || 0;
+              const retiradas = transactions?.filter(t => t.type === 'retirada').reduce((s, t) => s + Math.abs(Number(t.amount)), 0) || 0;
+              const despesas = transactions?.filter(t => !['aporte', 'retirada'].includes(t.type)).reduce((s, t) => s + Math.abs(Number(t.amount)), 0) || 0;
+              const depositsMonth = totalDeposits || 0;
+              const lucro = betsProfit || 0;
+              const saldo = aportes + lucro - retiradas - despesas;
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <StatCard title="Aportes" value={formatCurrency(aportes)} icon={TrendingUp} variant="success" />
+                    <StatCard title="Lucro das Apostas" value={formatCurrency(lucro)} icon={TrendingUp} variant={lucro >= 0 ? 'success' : 'danger'} />
+                    <StatCard title="Depósitos em Contas" value={formatCurrency(depositsMonth)} icon={PiggyBank} variant="primary" subtitle="Depositado em contas de apostas" />
+                    <StatCard title="Retiradas" value={formatCurrency(retiradas)} icon={TrendingDown} variant="danger" />
+                    <StatCard title="Despesas" value={formatCurrency(despesas)} icon={TrendingDown} variant="danger" subtitle="Excluindo aportes e retiradas" />
+                  </div>
+
+                  <Card className={cn("border-2", saldo >= 0 ? "border-success/50" : "border-destructive/50")}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Landmark className="h-5 w-5" />
+                        Fluxo de Caixa do Mês
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span>Aportes</span>
+                          <span className="mono-number text-success">+{formatCurrency(aportes)}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span>Lucro de Apostas</span>
+                          <span className={cn("mono-number", lucro >= 0 ? "text-success" : "text-destructive")}>{formatCurrency(lucro)}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span>(-) Retiradas</span>
+                          <span className="mono-number text-destructive">-{formatCurrency(retiradas)}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span>(-) Despesas Operacionais</span>
+                          <span className="mono-number text-destructive">-{formatCurrency(despesas)}</span>
+                        </div>
+                        <div className="flex justify-between py-3 bg-secondary/50 rounded-lg px-4 mt-4">
+                          <span className="font-bold text-lg">= Saldo do Período</span>
+                          <span className={cn("mono-number font-bold text-lg", saldo >= 0 ? "text-success" : "text-destructive")}>
+                            {formatCurrency(saldo)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-2 border-t border-dashed border-border mt-4">
+                          <span className="text-muted-foreground">Depósitos em Contas (redistribuição)</span>
+                          <span className="mono-number text-primary">{formatCurrency(depositsMonth)}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              );
+            })()}
           </TabsContent>
 
           {/* Transactions Tab */}
