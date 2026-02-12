@@ -9,7 +9,9 @@ import {
   ChevronLeft,
   ChevronRight,
   UserPlus,
-  Cpu
+  Cpu,
+  ArrowDownToLine,
+  Building2
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,15 +36,18 @@ const operatorMenuItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
   { title: 'Apostas', url: '/apostas', icon: Receipt },
   { title: 'Contas', url: '/contas', icon: CreditCard },
+  { title: 'Depósitos', url: '/depositos', icon: ArrowDownToLine },
 ];
 
 const adminMenuItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
   { title: 'Apostas', url: '/apostas', icon: Receipt },
   { title: 'Contas', url: '/contas', icon: CreditCard },
+  { title: 'Depósitos', url: '/depositos', icon: ArrowDownToLine },
   { title: 'Financeiro', url: '/financeiro', icon: Wallet },
   { title: 'Operadores', url: '/operadores', icon: Users },
   { title: 'Criar Usuário', url: '/criar-usuario', icon: UserPlus },
+  { title: 'Casas', url: '/casas', icon: Building2 },
   { title: 'Softwares', url: '/softwares', icon: Cpu },
   { title: 'Analytics', url: '/analytics', icon: TrendingUp },
 ];

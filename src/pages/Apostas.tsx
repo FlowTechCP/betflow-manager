@@ -57,6 +57,7 @@ export default function Apostas() {
         .select('*, bookmaker:bookmakers(name), account:accounts(login_nick)')
         .order('date', { ascending: false })
         .order('created_at', { ascending: false });
+      // Note: pendentes will be sorted to top in the UI
       if (!isAdmin && profile?.id) query = query.eq('operator_id', profile.id);
       if (dateFilter.start) query = query.gte('date', dateFilter.start);
       if (dateFilter.end) query = query.lte('date', dateFilter.end);
@@ -219,7 +220,15 @@ export default function Apostas() {
               <div className="space-y-2">
                 {[...Array(10)].map((_, i) => <Skeleton key={i} className="h-12" />)}
               </div>
-            ) : bets && bets.length > 0 ? (
+            ) : bets && bets.length > 0 ? (() => {
+              // Sort: pendentes first, then by date desc
+              const sortedBets = [...bets].sort((a, b) => {
+                const aP = a.result === 'pendente' ? 0 : 1;
+                const bP = b.result === 'pendente' ? 0 : 1;
+                if (aP !== bP) return aP - bP;
+                return 0; // keep original order for same group
+              });
+              return (
               <div className="overflow-x-auto">
                 <table className="data-table">
                   <thead>
@@ -238,7 +247,7 @@ export default function Apostas() {
                     </tr>
                   </thead>
                   <tbody>
-                    {bets.map((bet: any) => (
+                    {sortedBets.map((bet: any) => (
                       <tr key={bet.id}>
                         <td className="mono-number">{formatDate(bet.date)}</td>
                         <td>{bet.bookmaker?.name}</td>
@@ -267,7 +276,8 @@ export default function Apostas() {
                   </tbody>
                 </table>
               </div>
-            ) : (
+              );
+            })() : (
               <div className="text-center py-8 text-muted-foreground">
                 Nenhuma aposta encontrada.
               </div>
