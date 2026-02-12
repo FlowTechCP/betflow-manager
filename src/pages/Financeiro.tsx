@@ -132,28 +132,55 @@ export default function Financeiro() {
     is_recurring: false,
   });
 
+  // Helper to update bank balance
+  const updateBankBalance = async (bankName: string, delta: number) => {
+    const bank = bankBalances?.find(b => b.bank_name === bankName);
+    if (bank) {
+      await supabase.from('bank_balances').update({
+        current_balance: Number(bank.current_balance) + delta,
+      }).eq('id', bank.id);
+    }
+  };
+
+  // Determine the signed amount for a transaction (aportes/recebidos are positive, others negative)
+  const getSignedAmount = (type: TransactionType, amount: number) => {
+    const positiveTypes: TransactionType[] = ['aporte', 'recebido'];
+    return positiveTypes.includes(type) ? Math.abs(amount) : -Math.abs(amount);
+  };
+
   // Save transaction mutation (create or update)
   const saveTransaction = useMutation({
     mutationFn: async () => {
+      const amount = parseFloat(form.amount);
       const payload = {
         date: form.date,
         type: form.type,
         category: form.category || null,
-        amount: parseFloat(form.amount),
+        amount,
         description: form.description || null,
         bank_name: form.bank_name,
         is_recurring: form.is_recurring,
       };
       if (editingTransaction) {
+        // Reverse old bank effect
+        const oldDelta = getSignedAmount(editingTransaction.type, Number(editingTransaction.amount));
+        if (editingTransaction.bank_name) {
+          await updateBankBalance(editingTransaction.bank_name, -oldDelta);
+        }
         const { error } = await supabase.from('transactions').update(payload).eq('id', editingTransaction.id);
         if (error) throw error;
+        // Apply new bank effect
+        await updateBankBalance(form.bank_name, getSignedAmount(form.type, amount));
       } else {
         const { error } = await supabase.from('transactions').insert(payload);
         if (error) throw error;
+        // Apply bank effect
+        await updateBankBalance(form.bank_name, getSignedAmount(form.type, amount));
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-balances'] });
       toast.success(editingTransaction ? 'Transação atualizada!' : 'Transação registrada!');
       setIsDialogOpen(false);
       setEditingTransaction(null);
@@ -167,11 +194,18 @@ export default function Financeiro() {
   // Delete transaction mutation
   const deleteTransaction = useMutation({
     mutationFn: async (id: string) => {
+      // Find the transaction to reverse its bank effect
+      const tx = transactions?.find(t => t.id === id);
+      if (tx && tx.bank_name) {
+        const delta = getSignedAmount(tx.type, Number(tx.amount));
+        await updateBankBalance(tx.bank_name, -delta);
+      }
       const { error } = await supabase.from('transactions').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-balances'] });
       toast.success('Transação excluída!');
       setDeletingId(null);
     },
