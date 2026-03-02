@@ -24,6 +24,7 @@ export default function Depositos() {
     account_id: '',
     amount: '',
     description: '',
+    bank_name: '',
   });
 
   // Fetch accounts for dropdown
@@ -40,6 +41,19 @@ export default function Depositos() {
       return data;
     },
     enabled: !!profile?.id,
+  });
+
+  // Fetch bank balances for dropdown
+  const { data: bankBalances } = useQuery({
+    queryKey: ['bank-balances'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('bank_balances')
+        .select('*')
+        .order('bank_name');
+      if (error) throw error;
+      return data;
+    },
   });
 
   // Fetch deposits
@@ -73,10 +87,11 @@ export default function Depositos() {
         amount,
         description: form.description || null,
         created_by: profile.id,
+        bank_name: form.bank_name || null,
       });
       if (depositError) throw depositError;
 
-      // Update account balance
+      // Update account balance (add deposit)
       const { data: account } = await supabase
         .from('accounts')
         .select('current_balance, total_deposited')
@@ -93,13 +108,28 @@ export default function Depositos() {
           .eq('id', form.account_id);
         if (updateError) throw updateError;
       }
+
+      // Deduct from bank balance
+      if (form.bank_name) {
+        const { data: bank } = await supabase
+          .from('bank_balances')
+          .select('id, current_balance')
+          .eq('bank_name', form.bank_name)
+          .single();
+        if (bank) {
+          await supabase.from('bank_balances').update({
+            current_balance: Number(bank.current_balance) - amount,
+          }).eq('id', bank.id);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deposits'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-balances'] });
       toast.success('Depósito registrado!');
       setIsDialogOpen(false);
-      setForm({ date: new Date().toISOString().split('T')[0], account_id: '', amount: '', description: '' });
+      setForm({ date: new Date().toISOString().split('T')[0], account_id: '', amount: '', description: '', bank_name: '' });
     },
     onError: (e) => toast.error('Erro: ' + e.message),
   });
@@ -152,6 +182,21 @@ export default function Depositos() {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label>Banco de Origem</Label>
+                  <Select value={form.bank_name} onValueChange={(v) => setForm({ ...form, bank_name: v })} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="De qual banco sai o dinheiro?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankBalances?.map((bank: any) => (
+                        <SelectItem key={bank.id} value={bank.bank_name}>
+                          {bank.bank_name} — {formatCurrency(Number(bank.current_balance))}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label>Descrição (opcional)</Label>
                   <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Observações" />
                 </div>
@@ -193,6 +238,7 @@ export default function Depositos() {
                       <th>Data</th>
                       <th>Conta</th>
                       <th>Casa</th>
+                      <th>Banco</th>
                       <th>Valor</th>
                       <th>Descrição</th>
                     </tr>
@@ -203,6 +249,7 @@ export default function Depositos() {
                         <td className="mono-number">{formatDate(d.date)}</td>
                         <td>{d.account?.login_nick}</td>
                         <td>{d.account?.bookmaker?.name}</td>
+                        <td>{d.bank_name || '-'}</td>
                         <td className="mono-number font-medium text-success">{formatCurrency(Number(d.amount))}</td>
                         <td className="text-sm text-muted-foreground">{d.description || '-'}</td>
                       </tr>
