@@ -15,7 +15,8 @@ import { AccountDepositHistory } from '@/components/contas/AccountDepositHistory
 import { AccountTransactionDialog } from '@/components/contas/AccountTransactionDialog';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
-import { Plus, CreditCard, History, ArrowUpDown } from 'lucide-react';
+import { Plus, CreditCard, History, ArrowUpDown, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Account, AccountStatus, accountStatusLabels } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -93,6 +94,35 @@ export default function Contas() {
     notes: '',
   });
 
+  // Delete account mutation
+  const deleteAccount = useMutation({
+    mutationFn: async (accountId: string) => {
+      // Delete related deposits first
+      const { error: depositsError } = await supabase
+        .from('deposits')
+        .delete()
+        .eq('account_id', accountId);
+      if (depositsError) throw depositsError;
+
+      const { error } = await supabase
+        .from('accounts')
+        .delete()
+        .eq('id', accountId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['deposits'] });
+      toast.success('Conta excluída com sucesso!');
+      setIsDialogOpen(false);
+      setEditingAccount(null);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error('Erro ao excluir conta: ' + error.message);
+    },
+  });
+
   // Create/Update account mutation
   const saveAccount = useMutation({
     mutationFn: async () => {
@@ -115,7 +145,6 @@ export default function Contas() {
       };
 
       if (editingAccount) {
-        // On edit, don't change balance fields
         const { current_balance, total_deposited, ...updateData } = accountData;
         const { error } = await supabase
           .from('accounts')
@@ -123,7 +152,6 @@ export default function Contas() {
           .eq('id', editingAccount.id);
         if (error) throw error;
       } else {
-        // Create account
         const { data: newAccount, error } = await supabase
           .from('accounts')
           .insert(accountData)
@@ -131,7 +159,6 @@ export default function Contas() {
           .single();
         if (error) throw error;
 
-        // If there's an initial deposit, create a deposit record and deduct from bank
         if (initialDeposit > 0 && newAccount) {
           const { error: depositError } = await supabase.from('deposits').insert({
             date: form.acquisition_date,
@@ -143,7 +170,6 @@ export default function Contas() {
           });
           if (depositError) throw depositError;
 
-          // Deduct from bank balance
           if (form.deposit_bank_name) {
             const { data: bank } = await supabase
               .from('bank_balances')
@@ -369,13 +395,42 @@ export default function Contas() {
                   </>
                 )}
 
-                <div className="sm:col-span-2 flex justify-end gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={saveAccount.isPending}>
-                    {saveAccount.isPending ? 'Salvando...' : 'Salvar'}
-                  </Button>
+                <div className="sm:col-span-2 flex justify-between pt-4">
+                  {editingAccount ? (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button type="button" variant="destructive" size="sm" className="gap-1">
+                          <Trash2 className="h-4 w-4" />
+                          Excluir
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Excluir conta?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Isso excluirá a conta "{editingAccount.login_nick}" e todo o histórico de depósitos. Esta ação não pode ser desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteAccount.mutate(editingAccount.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : <div />}
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={saveAccount.isPending}>
+                      {saveAccount.isPending ? 'Salvando...' : 'Salvar'}
+                    </Button>
+                  </div>
                 </div>
               </form>
             </DialogContent>
