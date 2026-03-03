@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { AccountDepositHistory } from '@/components/contas/AccountDepositHistory';
+import { AccountTransactionDialog } from '@/components/contas/AccountTransactionDialog';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
-import { Plus, CreditCard, History } from 'lucide-react';
+import { Plus, CreditCard, History, ArrowUpDown } from 'lucide-react';
 import { Account, AccountStatus, accountStatusLabels } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +25,7 @@ export default function Contas() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [depositHistoryAccount, setDepositHistoryAccount] = useState<{ id: string; name: string } | null>(null);
+  const [transactionAccount, setTransactionAccount] = useState<{ id: string; name: string; currentBalance: number } | null>(null);
 
   // Fetch bookmakers
   const { data: bookmakers } = useQuery({
@@ -469,6 +471,14 @@ export default function Contas() {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => setTransactionAccount({ id: account.id, name: `${account.login_nick} — ${account.bookmaker?.name}`, currentBalance: Number(account.current_balance) })}
+                              title="Depositar / Sacar"
+                            >
+                              <ArrowUpDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => setDepositHistoryAccount({ id: account.id, name: `${account.login_nick} — ${account.bookmaker?.name}` })}
                               title="Ver depósitos"
                             >
@@ -498,6 +508,13 @@ export default function Contas() {
             onOpenChange={(open) => { if (!open) setDepositHistoryAccount(null); }}
           />
         )}
+
+        {/* Transaction Dialog */}
+        <AccountTransactionDialog
+          account={transactionAccount}
+          open={!!transactionAccount}
+          onOpenChange={(open) => { if (!open) setTransactionAccount(null); }}
+        />
       </div>
     </DashboardLayout>
   );
