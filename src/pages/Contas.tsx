@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { AccountDepositHistory } from '@/components/contas/AccountDepositHistory';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
-import { Plus, CreditCard, AlertTriangle } from 'lucide-react';
+import { Plus, CreditCard, History } from 'lucide-react';
 import { Account, AccountStatus, accountStatusLabels } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +23,7 @@ export default function Contas() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [depositHistoryAccount, setDepositHistoryAccount] = useState<{ id: string; name: string } | null>(null);
 
   // Fetch bookmakers
   const { data: bookmakers } = useQuery({
@@ -32,6 +34,19 @@ export default function Contas() {
         .select('*')
         .eq('active', true)
         .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch bank balances for initial deposit
+  const { data: bankBalances } = useQuery({
+    queryKey: ['bank-balances'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('bank_balances')
+        .select('*')
+        .order('bank_name');
       if (error) throw error;
       return data;
     },
@@ -71,7 +86,8 @@ export default function Contas() {
     acquisition_date: new Date().toISOString().split('T')[0],
     limitation_date: '',
     vendor_name: '',
-    current_balance: '0',
+    initial_deposit: '',
+    deposit_bank_name: '',
     notes: '',
   });
 
@@ -79,6 +95,8 @@ export default function Contas() {
   const saveAccount = useMutation({
     mutationFn: async () => {
       if (!profile?.id) throw new Error('Usuário não encontrado');
+
+      const initialDeposit = parseFloat(form.initial_deposit) || 0;
 
       const accountData = {
         bookmaker_id: form.bookmaker_id,
@@ -89,23 +107,60 @@ export default function Contas() {
         acquisition_date: form.acquisition_date,
         limitation_date: form.current_status === 'limitada' && form.limitation_date ? form.limitation_date : null,
         vendor_name: form.vendor_name || null,
-        current_balance: parseFloat(form.current_balance) || 0,
+        current_balance: editingAccount ? undefined : initialDeposit,
+        total_deposited: editingAccount ? undefined : initialDeposit,
         notes: form.notes || null,
       };
 
       if (editingAccount) {
+        // On edit, don't change balance fields
+        const { current_balance, total_deposited, ...updateData } = accountData;
         const { error } = await supabase
           .from('accounts')
-          .update(accountData)
+          .update(updateData)
           .eq('id', editingAccount.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('accounts').insert(accountData);
+        // Create account
+        const { data: newAccount, error } = await supabase
+          .from('accounts')
+          .insert(accountData)
+          .select('id')
+          .single();
         if (error) throw error;
+
+        // If there's an initial deposit, create a deposit record and deduct from bank
+        if (initialDeposit > 0 && newAccount) {
+          const { error: depositError } = await supabase.from('deposits').insert({
+            date: form.acquisition_date,
+            account_id: newAccount.id,
+            amount: initialDeposit,
+            description: 'Depósito inicial',
+            created_by: profile.id,
+            bank_name: form.deposit_bank_name || null,
+          });
+          if (depositError) throw depositError;
+
+          // Deduct from bank balance
+          if (form.deposit_bank_name) {
+            const { data: bank } = await supabase
+              .from('bank_balances')
+              .select('id, current_balance')
+              .eq('bank_name', form.deposit_bank_name)
+              .single();
+            if (bank) {
+              await supabase.from('bank_balances').update({
+                current_balance: Number(bank.current_balance) - initialDeposit,
+              }).eq('id', bank.id);
+            }
+          }
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['deposits'] });
       toast.success(editingAccount ? 'Conta atualizada!' : 'Conta criada com sucesso!');
       setIsDialogOpen(false);
       setEditingAccount(null);
@@ -125,7 +180,8 @@ export default function Contas() {
       acquisition_date: new Date().toISOString().split('T')[0],
       limitation_date: '',
       vendor_name: '',
-      current_balance: '0',
+      initial_deposit: '',
+      deposit_bank_name: '',
       notes: '',
     });
   };
@@ -140,7 +196,8 @@ export default function Contas() {
       acquisition_date: account.acquisition_date,
       limitation_date: account.limitation_date || '',
       vendor_name: account.vendor_name || '',
-      current_balance: account.current_balance.toString(),
+      initial_deposit: '',
+      deposit_bank_name: '',
       notes: account.notes || '',
     });
     setIsDialogOpen(true);
@@ -272,15 +329,43 @@ export default function Contas() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Saldo Atual (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={form.current_balance}
-                    onChange={(e) => setForm({ ...form, current_balance: e.target.value })}
-                  />
-                </div>
+                {/* Initial deposit - only on creation */}
+                {!editingAccount && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Depósito Inicial (R$)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={form.initial_deposit}
+                        onChange={(e) => setForm({ ...form, initial_deposit: e.target.value })}
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    {parseFloat(form.initial_deposit) > 0 && (
+                      <div className="space-y-2">
+                        <Label>Banco de Origem</Label>
+                        <Select
+                          value={form.deposit_bank_name}
+                          onValueChange={(v) => setForm({ ...form, deposit_bank_name: v })}
+                          required
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="De qual banco?" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {bankBalances?.map((bank) => (
+                              <SelectItem key={bank.id} value={bank.bank_name}>
+                                {bank.bank_name} — {formatCurrency(Number(bank.current_balance))}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </>
+                )}
 
                 <div className="sm:col-span-2 flex justify-end gap-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -348,6 +433,7 @@ export default function Contas() {
                       {isAdmin && <th>Operador</th>}
                       <th>Status</th>
                       <th>Saldo Atual</th>
+                      <th>Total Depositado</th>
                       <th>Custo</th>
                       <th>Aquisição</th>
                       <th>Ações</th>
@@ -368,16 +454,27 @@ export default function Contas() {
                           <StatusBadge status={account.current_status} />
                         </td>
                         <td className="mono-number">{formatCurrency(Number(account.current_balance))}</td>
+                        <td className="mono-number">{formatCurrency(Number(account.total_deposited))}</td>
                         <td className="mono-number">{formatCurrency(Number(account.purchase_price))}</td>
                         <td className="mono-number">{formatDate(account.acquisition_date)}</td>
                         <td>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(account)}
-                          >
-                            Editar
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(account)}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDepositHistoryAccount({ id: account.id, name: `${account.login_nick} — ${account.bookmaker?.name}` })}
+                              title="Ver depósitos"
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -391,6 +488,16 @@ export default function Contas() {
             )}
           </CardContent>
         </Card>
+
+        {/* Deposit History Dialog */}
+        {depositHistoryAccount && (
+          <AccountDepositHistory
+            accountId={depositHistoryAccount.id}
+            accountName={depositHistoryAccount.name}
+            open={!!depositHistoryAccount}
+            onOpenChange={(open) => { if (!open) setDepositHistoryAccount(null); }}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
